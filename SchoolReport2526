@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; background:#fff; overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  #app { display:flex; flex-direction:column; height:100%; }
+
+  header {
+    background:#fff; border-bottom:1px solid #e6e6e6;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    padding:8px 12px; flex-wrap:wrap; z-index:60;
+  }
+  .btn {
+    border:1px solid #d4d4d4; background:#fff; color:#333;
+    width:38px; height:38px; border-radius:8px; font-size:17px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s, transform .08s; user-select:none;
+  }
+  .btn:hover { background:#f3f3f3; }
+  .btn:active { transform:scale(.93); }
+  .btn:disabled { opacity:.3; cursor:default; }
+  .btn.on { background:#2563eb; border-color:#2563eb; color:#fff; }
+  #pageInfo { font-size:14px; color:#555; min-width:64px; text-align:center; }
+  .sep { width:1px; height:24px; background:#e0e0e0; }
+
+  #stage {
+    flex:1; position:relative; display:flex; align-items:center; justify-content:center;
+    overflow:hidden; background:#fafafa; padding:16px;
+  }
+
+  /* ---------- DESKTOP BOOK ---------- */
+  #bookWrap {
+    position:relative; perspective:2600px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #book {
+    position:relative; transform-style:preserve-3d;
+    transition:transform .5s ease;
+    width:100%; height:100%; cursor:pointer;
+  }
+  .leaf {
+    position:absolute; top:0; left:50%; width:50%; height:100%;
+    transform-style:preserve-3d; transform-origin:left center;
+    transition:transform .8s cubic-bezier(.4,.15,.25,1);
+  }
+  .leaf.turned { transform:rotateY(-180deg); }
+  .face {
+    position:absolute; inset:0; backface-visibility:hidden;
+    overflow:hidden; background:#fff; border-radius:3px;
+    box-shadow:0 4px 16px rgba(0,0,0,.18);
+  }
+  .face.back { transform:rotateY(180deg); }
+  .face img { width:100%; height:100%; object-fit:contain; display:block; background:#fff; pointer-events:none; }
+  .face.blank { background:#fff; }
+
+  /* ---------- MOBILE SINGLE PAGE ---------- */
+  #mobileWrap { position:relative; display:none; align-items:center; justify-content:center; }
+  #mPage { position:relative; perspective:2000px; transition:transform .3s; cursor:pointer; }
+  #mBase { width:100%; height:100%; object-fit:contain; display:block; background:#fff;
+    box-shadow:0 4px 16px rgba(0,0,0,.18); border-radius:3px; }
+  #flipper {
+    position:absolute; inset:0; transform-style:preserve-3d; transform-origin:left center; display:none;
+  }
+  #flipper .ff, #flipper .fb { position:absolute; inset:0; backface-visibility:hidden;
+    overflow:hidden; background:#fff; border-radius:3px; box-shadow:0 4px 16px rgba(0,0,0,.18); }
+  #flipper .fb { transform:rotateY(180deg); background:#fff; }
+  #flipper img { width:100%; height:100%; object-fit:contain; display:block; background:#fff; }
+
+  #app.mobile #bookWrap { display:none; }
+  #app.mobile #mobileWrap { display:flex; }
+
+  .navzone { position:absolute; top:0; bottom:0; width:18%; z-index:40; cursor:pointer; }
+  #navPrev { left:0; } #navNext { right:0; }
+
+  .corner { position:absolute; width:70px; height:70px; max-width:30%; max-height:30%;
+    z-index:46; cursor:pointer; }
+  .corner.tr { top:0; right:0; } .corner.br { bottom:0; right:0; }
+  .corner.tl { top:0; left:0; } .corner.bl { bottom:0; left:0; }
+  .corner::after { content:''; position:absolute; inset:0; opacity:0; transition:opacity .2s; }
+  .corner:hover::after { opacity:1; }
+  .corner.br::after { background:linear-gradient(to top left, rgba(0,0,0,.28), transparent 55%); border-bottom-right-radius:3px; }
+  .corner.tr::after { background:linear-gradient(to bottom left, rgba(0,0,0,.28), transparent 55%); border-top-right-radius:3px; }
+  .corner.bl::after { background:linear-gradient(to top right, rgba(0,0,0,.28), transparent 55%); border-bottom-left-radius:3px; }
+  .corner.tl::after { background:linear-gradient(to bottom right, rgba(0,0,0,.28), transparent 55%); border-top-left-radius:3px; }
+
+  /* ---------- THUMBNAILS ---------- */
+  #thumbs { background:#fff; border-top:1px solid #e6e6e6; display:flex; gap:8px;
+    padding:8px 10px; overflow-x:auto; overflow-y:hidden; z-index:50;
+    max-height:96px; transition:max-height .35s ease, padding .35s ease, opacity .25s ease;
+  }
+  #thumbs.collapsed { max-height:0; padding-top:0; padding-bottom:0;
+    opacity:0; border-top-color:transparent; pointer-events:none; }
+  .thumb { flex:0 0 auto; height:62px; border:2px solid transparent; border-radius:6px;
+    cursor:pointer; overflow:hidden; background:#f0f0f0; position:relative; }
+  .thumb img { height:100%; display:block; object-fit:cover; }
+  .thumb.active { border-color:#2563eb; }
+  .thumb span { position:absolute; bottom:0; right:0; background:rgba(0,0,0,.55);
+    color:#fff; font-size:10px; padding:1px 5px; border-radius:6px 0 0 0; }
+  #thumbs::-webkit-scrollbar { height:8px; }
+  #thumbs::-webkit-scrollbar-thumb { background:#ccc; border-radius:4px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="btn" id="prevBtn" title="Previous">‹</button>
+    <span id="pageInfo">Cover</span>
+    <button class="btn" id="nextBtn" title="Next">›</button>
+    <div class="sep"></div>
+    <button class="btn" id="zoomOut" title="Zoom out">−</button>
+    <button class="btn" id="zoomIn" title="Zoom in">+</button>
+    <button class="btn" id="zoomReset" title="Reset zoom">⤢</button>
+    <div class="sep"></div>
+    <button class="btn on" id="toggleThumbs" title="Show/Hide preview">▦</button>
+  </header>
+
+  <div id="stage">
+    <div id="navPrev" class="navzone"></div>
+    <div id="navNext" class="navzone"></div>
+
+    <div id="bookWrap">
+      <div id="book"></div>
+      <div class="corner tl" data-dir="prev"></div>
+      <div class="corner bl" data-dir="prev"></div>
+      <div class="corner tr" data-dir="next"></div>
+      <div class="corner br" data-dir="next"></div>
+    </div>
+
+    <div id="mobileWrap"><div id="mPage">
+      <img id="mBase" alt="page">
+      <div id="flipper">
+        <div class="ff"><img id="ffImg" alt=""></div>
+        <div class="fb"></div>
+      </div>
+      <div class="corner tl" data-dir="prev"></div>
+      <div class="corner bl" data-dir="prev"></div>
+      <div class="corner tr" data-dir="next"></div>
+      <div class="corner br" data-dir="next"></div>
+    </div></div>
+  </div>
+
+  <div id="thumbs"></div>
+</div>
+
+<script>
+  // Images stored in the repo under /images, named p1.png ... p8.png
+  const PAGES = [
+    "images/p1.png",
+    "images/p2.png",
+    "images/p3.png",
+    "images/p4.png",
+    "images/p5.png",
+    "images/p6.png",
+    "images/p7.png",
+    "images/p8.png"
+  ];
+
+  const FACES = [...PAGES, ""];        // 9 faces (P1..P8, blank)
+  const RATIO = 0.72;
+  const FLIP_MS = 700;
+
+  let mobile = false;
+  let zoom = 1;
+  let animating = false;
+
+  const numLeaves = Math.ceil(FACES.length / 2); // 5
+  let currentLeaf = 0;
+  let currentPage = 0;
+
+  const app      = document.getElementById('app');
+  const stage    = document.getElementById('stage');
+  const bookWrap = document.getElementById('bookWrap');
+  const book     = document.getElementById('book');
+  const mPage    = document.getElementById('mPage');
+  const mBase    = document.getElementById('mBase');
+  const flipper  = document.getElementById('flipper');
+  const ffImg    = document.getElementById('ffImg');
+  const pageInfo = document.getElementById('pageInfo');
+  const prevBtn  = document.getElementById('prevBtn');
+  const nextBtn  = document.getElementById('nextBtn');
+  const thumbsBar= document.getElementById('thumbs');
+  const toggleThumbsBtn = document.getElementById('toggleThumbs');
+
+  // ---------------- build leaves (store face refs) ----------------
+  const leaves = [];
+  const frontImg = [], backImg = [], frontFace = [], backFace = [];
+  for (let i = 0; i < numLeaves; i++) {
+    const front = FACES[2*i];
+    const back  = FACES[2*i + 1];
+    const leaf = document.createElement('div');
+    leaf.className = 'leaf';
+    leaf.dataset.i = i;
+    leaf.innerHTML =
+      `<div class="face front${front?'':' blank'}"><img${front?` src="${front}"`:' style="display:none"'}></div>` +
+      `<div class="face back${back?'':' blank'}"><img${back?` src="${back}"`:' style="display:none"'}></div>`;
+    book.appendChild(leaf);
+    leaves.push(leaf);
+    frontFace[i] = leaf.querySelector('.front');
+    backFace[i]  = leaf.querySelector('.back');
+    frontImg[i]  = frontFace[i].querySelector('img');
+    backImg[i]   = backFace[i].querySelector('img');
+  }
+  function setFace(img, face, src) {
+    if (src) { img.src = src; img.style.display = 'block'; face.classList.remove('blank'); }
+    else     { img.removeAttribute('src'); img.style.display = 'none'; face.classList.add('blank'); }
+  }
+  function restoreFaces() {
+    for (let i = 0; i < numLeaves; i++) {
+      setFace(frontImg[i], frontFace[i], FACES[2*i]);
+      setFace(backImg[i],  backFace[i],  FACES[2*i + 1]);
+    }
+  }
+
+  // ---------------- thumbnails ----------------
+  PAGES.forEach((src, i) => {
+    const t = document.createElement('div');
+    t.className = 'thumb';
+    t.innerHTML = `<img src="${src}"><span>${i+1}</span>`;
+    t.onclick = () => jumpToPage(i);
+    thumbsBar.appendChild(t);
+  });
+
+  let thumbsVisible = true;
+  function setThumbs(visible) {
+    thumbsVisible = visible;
+    thumbsBar.classList.toggle('collapsed', !visible);
+    toggleThumbsBtn.classList.toggle('on', visible);
+    toggleThumbsBtn.title = visible ? 'Hide preview' : 'Show preview';
+    setTimeout(sizeBook, 360);
+  }
+  toggleThumbsBtn.onclick = () => setThumbs(!thumbsVisible);
+
+  function sizeBook() {
+    const availW = stage.clientWidth  - 32;
+    const availH = stage.clientHeight - 32;
+    if (mobile) {
+      let h = availH, w = h * RATIO;
+      if (w > availW) { w = availW; h = w / RATIO; }
+      mPage.style.width  = w + 'px';
+      mPage.style.height = h + 'px';
+    } else {
+      let ph = availH, pw = ph * RATIO, bw = pw * 2;
+      if (bw > availW) { bw = availW; pw = bw / 2; ph = pw / RATIO; }
+      bookWrap.style.width  = bw + 'px';
+      bookWrap.style.height = ph + 'px';
+    }
+  }
+
+  function updateZ() {
+    leaves.forEach((leaf, i) => {
+      leaf.style.zIndex = (i < currentLeaf) ? (i + 1) : (numLeaves - i);
+    });
+  }
+  function updateBookTransform(leafState) {
+    const lf = (leafState == null) ? currentLeaf : leafState;
+    const shift = (lf === 0) ? -25 : 0;
+    book.style.transform = `translateX(${shift}%) scale(${zoom})`;
+  }
+
+  function updateInfo() {
+    if (mobile) {
+      pageInfo.textContent = (currentPage + 1) + ' / ' + PAGES.length;
+      prevBtn.disabled = currentPage === 0;
+      nextBtn.disabled = currentPage === PAGES.length - 1;
+      highlightThumb(currentPage);
+    } else {
+      let label;
+      if (currentLeaf === 0) label = 'Cover (1)';
+      else if (currentLeaf === numLeaves - 1) label = String(PAGES.length);
+      else label = (2*currentLeaf) + '–' + (2*currentLeaf + 1);
+      pageInfo.textContent = label;
+      prevBtn.disabled = currentLeaf === 0;
+      nextBtn.disabled = currentLeaf >= numLeaves - 1;
+      const vis = currentLeaf === 0 ? 0 : Math.min(2*currentLeaf, PAGES.length-1);
+      highlightThumb(vis);
+    }
+  }
+  function highlightThumb(i) {
+    document.querySelectorAll('.thumb').forEach((t,k)=>t.classList.toggle('active', k===i));
+    if (!thumbsVisible) return;
+    const a = document.querySelector('.thumb.active');
+    if (a) a.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'});
+  }
+
+  // ---------------- robust transition end (event OR timeout, once) ----------------
+  function onceTransition(el, prop, maxMs, done) {
+    let fired = false;
+    function finish() {
+      if (fired) return;
+      fired = true;
+      el.removeEventListener('transitionend', handler);
+      clearTimeout(timer);
+      done();
+    }
+    function handler(e) { if (prop && e.propertyName !== prop) return; finish(); }
+    el.addEventListener('transitionend', handler);
+    const timer = setTimeout(finish, maxMs);
+  }
+
+  // ---------------- DESKTOP: single-flip jump to any leaf ----------------
+  function jumpDesktop(target) {
+    if (animating || target === currentLeaf || target < 0 || target >= numLeaves) return;
+    animating = true;
+    const forward = target > currentLeaf;
+    let flip;
+
+    if (forward) {
+      flip = leaves[currentLeaf];
+      setFace(backImg[currentLeaf], backFace[currentLeaf], FACES[2*target - 1]);
+      if (currentLeaf + 1 < numLeaves)
+        setFace(frontImg[currentLeaf + 1], frontFace[currentLeaf + 1], FACES[2*target]);
+      flip.style.transition = 'none';
+      flip.style.zIndex = 100;
+      void flip.offsetWidth;
+      flip.style.transition = '';
+      flip.classList.add('turned');
+    } else {
+      flip = leaves[currentLeaf - 1];
+      setFace(frontImg[currentLeaf - 1], frontFace[currentLeaf - 1], FACES[2*target]);
+      if (currentLeaf - 2 >= 0 && 2*target - 1 >= 0)
+        setFace(backImg[currentLeaf - 2], backFace[currentLeaf - 2], FACES[2*target - 1]);
+      flip.style.transition = 'none';
+      flip.style.zIndex = 100;
+      void flip.offsetWidth;
+      flip.style.transition = '';
+      flip.classList.remove('turned');
+    }
+
+    updateBookTransform(target);
+    onceTransition(flip, 'transform', 900, () => {
+      restoreFaces();
+      leaves.forEach((l, i) => { l.style.transition = 'none'; l.classList.toggle('turned', i < target); });
+      currentLeaf = target;
+      void book.offsetWidth;
+      leaves.forEach(l => l.style.transition = '');
+      updateZ(); updateBookTransform(); updateInfo();
+      animating = false;
+    });
+    updateInfo();
+  }
+
+  // ---------------- MOBILE: single-flip jump to any page ----------------
+  // Turning sheet: FRONT = the page that lifts off, BACK = blank (paper reverse).
+  // The destination page lives on the base underneath, so it is never duplicated.
+  function mobileFlip(target) {
+    if (animating || target === currentPage || target < 0 || target >= PAGES.length) return;
+    animating = true;
+    const cur = currentPage, forward = target > cur;
+
+    if (forward) {
+      mBase.src = PAGES[target];   // destination revealed beneath
+      ffImg.src = PAGES[cur];      // current page is the sheet that turns away
+      flipper.style.transition = 'none';
+      flipper.style.transform  = 'rotateY(0deg)';
+      flipper.style.display     = 'block';
+      void flipper.offsetWidth;
+      flipper.style.transition = `transform ${FLIP_MS}ms cubic-bezier(.4,.15,.25,1)`;
+      flipper.style.transform  = 'rotateY(-180deg)';
+    } else {
+      mBase.src = PAGES[cur];      // current page stays beneath until covered
+      ffImg.src = PAGES[target];   // destination page swings in from the left
+      flipper.style.transition = 'none';
+      flipper.style.transform  = 'rotateY(-180deg)';
+      flipper.style.display     = 'block';
+      void flipper.offsetWidth;
+      flipper.style.transition = `transform ${FLIP_MS}ms cubic-bezier(.4,.15,.25,1)`;
+      flipper.style.transform  = 'rotateY(0deg)';
+    }
+    currentPage = target;
+    onceTransition(flipper, 'transform', FLIP_MS + 150, () => {
+      mBase.src = PAGES[target];
+      flipper.style.display = 'none';
+      animating = false; updateInfo();
+    });
+  }
+
+  // ---------------- nav ----------------
+  function next() { mobile ? mobileFlip(currentPage + 1) : jumpDesktop(currentLeaf + 1); }
+  function prev() { mobile ? mobileFlip(currentPage - 1) : jumpDesktop(currentLeaf - 1); }
+
+  function jumpToPage(pageIdx) {
+    if (animating) return;
+    if (mobile) {
+      mobileFlip(pageIdx);
+    } else {
+      const target = (pageIdx === 0) ? 0 : Math.floor((pageIdx - 1) / 2) + 1;
+      jumpDesktop(target);
+    }
+  }
+
+  function applyZoom() {
+    if (mobile) mPage.style.transform = `scale(${zoom})`;
+    else updateBookTransform();
+  }
+  document.getElementById('zoomIn').onclick    = () => { zoom = Math.min(zoom + 0.2, 3);   applyZoom(); };
+  document.getElementById('zoomOut').onclick   = () => { zoom = Math.max(zoom - 0.2, 0.5); applyZoom(); };
+  document.getElementById('zoomReset').onclick = () => { zoom = 1; applyZoom(); };
+
+  prevBtn.onclick = prev;
+  nextBtn.onclick = next;
+  document.getElementById('navPrev').onclick = prev;
+  document.getElementById('navNext').onclick = next;
+
+  document.querySelectorAll('.corner').forEach(c => {
+    c.addEventListener('click', e => {
+      e.stopPropagation();
+      c.dataset.dir === 'next' ? next() : prev();
+    });
+  });
+
+  function pageClick(el, e) {
+    const r = el.getBoundingClientRect();
+    if ((e.clientX - r.left) > r.width / 2) next(); else prev();
+  }
+  book.addEventListener('click',  e => pageClick(book,  e));
+  mPage.addEventListener('click', e => pageClick(mPage, e));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') next();
+    if (e.key === 'ArrowLeft')  prev();
+  });
+  stage.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    if ((e.clientX - r.left) > r.width / 2) next(); else prev();
+  });
+
+  function applyMode() {
+    app.classList.toggle('mobile', mobile);
+    animating = false;
+    restoreFaces();
+    if (mobile) {
+      currentPage = 0;
+      mBase.src = PAGES[0];
+      flipper.style.display = 'none';
+      mPage.style.transform = `scale(${zoom})`;
+    } else {
+      currentLeaf = 0;
+      leaves.forEach(l => { l.style.transition = 'none'; l.classList.remove('turned'); });
+      requestAnimationFrame(() => leaves.forEach(l => l.style.transition = ''));
+      updateZ(); updateBookTransform();
+    }
+    sizeBook(); updateInfo();
+  }
+  function checkMode() {
+    const m = window.matchMedia('(max-width: 768px)').matches;
+    if (m !== mobile) { mobile = m; applyMode(); }
+    else sizeBook();
+  }
+  window.addEventListener('resize', checkMode);
+
+  mobile = window.matchMedia('(max-width: 768px)').matches;
+  applyMode();
+</script>
+</body>
+</html>
